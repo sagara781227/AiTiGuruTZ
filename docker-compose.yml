@@ -1,0 +1,52 @@
+services:
+  postgres:
+    container_name: ${POSTGRES_HOST}
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_PORT_E}:${POSTGRES_PORT_I}"
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data/pgdata
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  redis:
+    image: redis:7-alpine
+    container_name: order_service_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis_data:/data
+    command: redis-server --appendonly yes
+
+  app:
+    build: .
+    container_name: order_service_app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE}
+      DATABASE_MAX_OVERFLOW: ${DATABASE_MAX_OVERFLOW}
+      HOST: ${HOST}
+      PORT: ${PORT}
+      DEBUG: ${DEBUG}
+      LOG_LEVEL: ${LOG_LEVEL}
+      REDIS_URL: ${REDIS_URL}
+      REDIS_LOCK_TIMEOUT: ${REDIS_LOCK_TIMEOUT}
+    ports:
+      - "${PORT}:${PORT}"
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+    command: uvicorn src.order_service.main:app --host 0.0.0.0 --port 8000 --reload
