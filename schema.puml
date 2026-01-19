@@ -1,0 +1,101 @@
+@startuml aitiguru
+' Настройка стиля и макета
+skinparam packageStyle rectangle
+skinparam linetype ortho
+skinparam monochrome true
+skinparam shadowing false
+
+' Сущности (таблицы)
+entity "categories" as categories {
+  * id : integer
+  --
+  * name : varchar(255)
+  parent_id : integer \<nullable>
+  path : varchar(255) \<nullable>
+  * level : integer \<default 1>
+  ..
+  pk id
+  fk parent_id → categories.id
+}
+
+entity "products" as products {
+  * id : integer
+  --
+  * name : varchar(255)
+  * quantity : decimal(12,3) \<default 0>
+  * price : decimal(12,2)
+  * category_id : integer
+  ..
+  pk id
+  fk category_id → categories.id
+}
+
+entity "customers" as customers {
+  * id : integer
+  --
+  * name : varchar(255)
+  phone : varchar(50) \<nullable>
+  address : text \<nullable>
+  ..
+  pk id
+}
+
+entity "orders" as orders {
+  * id : integer
+  --
+  * order_number : varchar(50) \<unique>
+  * customer_id : integer
+  order_date : timestamp with time zone \<default CURRENT_TIMESTAMP>
+  * status : varchar(50) \<default 'new'>
+  total_amount : decimal(12,2) \<default 0>
+  ..
+  pk id
+  fk customer_id → customers.id
+}
+
+entity "order_items" as order_items {
+  * id : integer
+  --
+  * order_id : integer
+  * product_id : integer
+  * quantity : decimal(10,3)
+  * unit_price : decimal(12,2)
+  * subtotal : decimal(12,2)
+  ..
+  pk id
+  fk order_id → orders.id
+  fk product_id → products.id
+  constraint unique(order_id, product_id)
+}
+
+' Связи между сущностями
+categories ||--o{ categories : "parent_id → id"
+products }|--|| categories : "category_id → id"
+orders }|--|| customers : "customer_id → id"
+order_items }|--|| orders : "order_id → id"
+order_items }|--|| products : "product_id → id"
+
+' Примечания к ограничениям
+note right of categories
+  CHECK (level >= 1)
+  CHECK (parent_id IS NULL OR parent_id != id)
+end note
+
+note right of products
+  CHECK (quantity >= 0)
+  CHECK (price >= 0)
+end note
+
+note right of orders
+  CHECK (status IN ('new', 'processing', 'shipped', 'delivered', 'cancelled'))
+  CHECK (total_amount >= 0)
+end note
+
+note right of order_items
+  CHECK (quantity > 0)
+  CHECK (unit_price >= 0)
+  CHECK (subtotal >= 0)
+  UNIQUE (order_id, product_id)
+end note
+
+@enduml
